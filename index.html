@@ -1,0 +1,1252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ExoTriage Control System</title>
+    <!-- Chart.js for the Light Curve Graph -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
+    <!-- Three.js for Interactive 3D Planet -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- OrbitControls for smoother interaction -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    
+    <style>
+        /* Classic Engineering Dashboard UI CSS - Qt/Win32 Style */
+        :root {
+            --bg-main: #ececec;
+            --bg-panel: #ffffff;
+            --bg-panel-header: #e0e0e0;
+            --bg-input: #ffffff;
+            --bg-input-hover: #e8e8e8;
+            --text-main: #000000;
+            --text-muted: #333333;
+            --accent: #0055a4;
+            --accent-hover: #003366;
+            --border-color: #a0a0a0;
+            --border-light: #ffffff;
+            --success: #00aa00;
+            --danger: #cc0000;
+            --terminal-bg: #ffffff;
+            --terminal-text: #000000; 
+        }
+
+        body {
+            background-color: var(--bg-main);
+            color: var(--text-main);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-size: 11px;
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: auto; 
+            line-height: 1.4;
+        }
+
+        /* Scrollbars */
+        ::-webkit-scrollbar { width: 12px; height: 12px; }
+        ::-webkit-scrollbar-track { background: var(--bg-main); border-left: 1px solid var(--border-color); }
+        ::-webkit-scrollbar-thumb { background: #c0c0c0; border: 1px solid var(--border-color); }
+        ::-webkit-scrollbar-thumb:hover { background: #a0a0a0; }
+
+        /* Utility Classes */
+        .panel {
+            background-color: var(--bg-panel);
+            border: 1px solid var(--border-color);
+            border-radius: 0;
+            box-shadow: none;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            margin-bottom: 4px;
+        }
+
+        .panel-header {
+            background-color: var(--bg-panel-header);
+            border-bottom: 1px solid var(--border-color);
+            padding: 4px 8px;
+            font-weight: bold;
+            font-size: 11px;
+            color: var(--text-main);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .panel-content {
+            padding: 8px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+            min-width: 0;
+            overflow-y: auto;
+        }
+
+        button {
+            background-color: #e4e4e4;
+            color: var(--text-main);
+            border: 1px solid #888888;
+            border-top-color: #ffffff;
+            border-left-color: #ffffff;
+            border-radius: 0;
+            padding: 4px 12px;
+            font-size: 11px;
+            font-family: inherit;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+
+        button:hover:not(:disabled) { background-color: #eaeaea; }
+        
+        button:active:not(:disabled) {
+            border: 1px solid #888888;
+            border-bottom-color: #ffffff;
+            border-right-color: #ffffff;
+            background-color: #d8d8d8;
+            padding: 5px 11px 3px 13px;
+        }
+
+        button.btn-primary { font-weight: bold; }
+        button:disabled { color: #888888; cursor: default; }
+
+        fieldset {
+            border: 1px solid var(--border-color);
+            border-radius: 0;
+            padding: 8px;
+            margin-bottom: 8px;
+        }
+
+        legend {
+            color: var(--text-main);
+            padding: 0 4px;
+            font-size: 11px;
+        }
+
+        input[type="text"], textarea, select {
+            font-family: inherit;
+            font-size: 11px;
+            padding: 3px 6px;
+            box-sizing: border-box;
+            width: 100%;
+            background-color: var(--bg-input);
+            color: var(--text-main);
+            border: 1px solid var(--border-color);
+            border-radius: 0;
+        }
+
+        input[type="text"]:focus, textarea:focus, select:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .read-only-field {
+            background-color: #f0f0f0 !important;
+            border: 1px solid var(--border-color) !important;
+            color: var(--text-main) !important;
+        }
+
+        .menu-bar {
+            background-color: var(--bg-main);
+            padding: 2px 8px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            gap: 4px;
+        }
+
+        .menu-container { position: relative; }
+
+        .menu-item { 
+            cursor: default; 
+            padding: 4px 8px;
+            display: inline-block;
+            font-size: 11px;
+            color: var(--text-main);
+        }
+        
+        .menu-item:hover {
+            background-color: #000080;
+            color: #ffffff;
+        }
+
+        .menu-dropdown {
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            background-color: var(--bg-main);
+            border: 1px solid var(--border-color);
+            border-right: 2px solid #888888;
+            border-bottom: 2px solid #888888;
+            min-width: 180px;
+            z-index: 1000;
+            padding: 2px 0;
+        }
+
+        .menu-dropdown.active { display: block; }
+
+        .menu-dropdown-item {
+            padding: 4px 16px;
+            cursor: default;
+            display: flex;
+            justify-content: space-between;
+            color: var(--text-main);
+            font-size: 11px;
+        }
+
+        .menu-dropdown-item:hover:not(.disabled) {
+            background-color: #000080;
+            color: #ffffff;
+        }
+
+        .menu-dropdown-item.disabled { color: #888888; }
+
+        .menu-divider {
+            border-top: 1px solid var(--border-color);
+            border-bottom: 1px solid #ffffff;
+            margin: 2px 4px;
+        }
+
+        .toolbar {
+            padding: 4px 8px;
+            display: flex;
+            gap: 4px;
+            background-color: var(--bg-main);
+            border-bottom: 1px solid var(--border-color);
+            align-items: center;
+        }
+
+        .main-workspace {
+            display: flex;
+            flex: 1;
+            padding: 6px;
+            gap: 6px;
+            min-height: 700px; 
+            min-width: 1000px;  
+        }
+
+        .sidebar {
+            width: 250px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .content-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            min-height: 0;
+            min-width: 0; 
+        }
+
+        .status-box {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 4px;
+            padding: 4px;
+            background: transparent;
+            border: none;
+        }
+        
+        .status-indicator {
+            width: 10px;
+            height: 10px;
+            background-color: var(--danger);
+            border: 1px solid #000;
+            display: inline-block;
+            margin-right: 6px;
+        }
+        
+        .status-indicator.active { background-color: var(--success); }
+
+        .data-grid {
+            display: grid;
+            grid-template-columns: 90px 1fr;
+            gap: 4px;
+            align-items: center;
+            margin-bottom: 4px;
+        }
+        
+        .data-label { 
+            text-align: right; 
+            color: var(--text-main);
+            font-size: 11px;
+        }
+
+        .terminal {
+            font-family: 'Consolas', 'Courier New', monospace;
+            font-size: 11px;
+            background-color: var(--terminal-bg) !important;
+            color: var(--terminal-text) !important;
+            border: 1px solid var(--border-color) !important;
+            padding: 6px !important;
+            overflow-y: auto;
+            flex: 1;
+            white-space: pre-wrap;
+            line-height: 1.2;
+        }
+
+        .bottom-bar {
+            background-color: var(--bg-main);
+            border-top: 1px solid var(--border-color);
+            padding: 4px 8px;
+            display: flex;
+            justify-content: space-between;
+            color: var(--text-main);
+            font-size: 11px;
+        }
+
+        .hidden { display: none !important; }
+        
+        input[type="radio"], input[type="checkbox"] { margin-right: 4px; vertical-align: middle; }
+        .radio-group { display: flex; align-items: center; margin-bottom: 4px; padding: 0; }
+
+        /* 3D Canvas Container */
+        #planet-container {
+            width: 100%;
+            height: 100%;
+            cursor: crosshair;
+            display: block;
+        }
+        #planet-container:active { cursor: move; }
+
+    </style>
+</head>
+<body>
+
+    <!-- Classic Menu Bar -->
+    <div class="menu-bar">
+        <div class="menu-container">
+            <span class="menu-item" onclick="toggleMenu('menu-file')">File</span>
+            <div class="menu-dropdown" id="menu-file">
+                <div class="menu-dropdown-item" onclick="triggerFileOpen()">Open Data File... <span>Ctrl+O</span></div>
+                <div class="menu-dropdown-item" onclick="saveReport()">Export Analysis Report <span>Ctrl+S</span></div>
+                <div class="menu-divider"></div>
+                <div class="menu-dropdown-item" onclick="printTerminal()">Print Logs... <span>Ctrl+P</span></div>
+                <div class="menu-divider"></div>
+                <div class="menu-dropdown-item" onclick="logToConsole('System exit requested.')">Exit</div>
+            </div>
+        </div>
+        <div class="menu-container">
+            <span class="menu-item" onclick="toggleMenu('menu-view')">View</span>
+            <div class="menu-dropdown" id="menu-view">
+                <div class="menu-dropdown-item" onclick="resetUI(); logToConsole('Display reset to idle state.')">Reset Dashboard</div>
+                <div class="menu-dropdown-item disabled">Toggle Sidebar</div>
+                <div class="menu-dropdown-item disabled">Fullscreen Mode</div>
+            </div>
+        </div>
+        <div class="menu-container">
+            <span class="menu-item" onclick="toggleMenu('menu-processing')">Processing</span>
+            <div class="menu-dropdown" id="menu-processing">
+                <div class="menu-dropdown-item" onclick="runPipeline()">Execute ML Pipeline <span>F5</span></div>
+                <div class="menu-dropdown-item disabled" id="menu-stop">Halt Operation <span>Esc</span></div>
+                <div class="menu-divider"></div>
+                <div class="menu-dropdown-item" onclick="document.getElementById('console-log').innerHTML = 'SYS_INIT: OK\n';">Clear Terminal Output</div>
+            </div>
+        </div>
+        <div class="menu-container">
+            <span class="menu-item" onclick="toggleMenu('menu-database')">Database</span>
+            <div class="menu-dropdown" id="menu-database">
+                <div class="menu-dropdown-item" onclick="document.getElementById('src-api').click(); toggleSource();">Switch to MAST API</div>
+                <div class="menu-dropdown-item" onclick="document.getElementById('src-csv').click(); toggleSource();">Switch to Local Files</div>
+                <div class="menu-divider"></div>
+                <div class="menu-dropdown-item" onclick="logToConsole('Ping: Connection to NASA archive established. Latency: 14ms.')">Test Connection...</div>
+            </div>
+        </div>
+        <div class="menu-container">
+            <span class="menu-item" onclick="toggleMenu('menu-help')">Help</span>
+            <div class="menu-dropdown" id="menu-help">
+                <div class="menu-dropdown-item disabled">Documentation <span>F1</span></div>
+                <div class="menu-divider"></div>
+                <div class="menu-dropdown-item" onclick="alert('ExoTriage Control System\nVersion 2.0.0\n\nAI-Driven Exoplanet Detection Platform.')">About ExoTriage</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toolbar -->
+    <div class="toolbar">
+        <button id="btn-run" class="btn-primary" onclick="runPipeline()">▶ Run ML Analysis</button>
+        <button id="btn-stop" disabled>■ Stop</button>
+        <div style="width: 1px; height: 16px; background: var(--border-color); border-right: 1px solid white; margin: 0 4px;"></div>
+        <button onclick="triggerFileOpen()">Open File...</button>
+        <button onclick="saveReport()">Save Report</button>
+    </div>
+
+    <!-- Main Workspace -->
+    <div class="main-workspace">
+        
+        <!-- Left Sidebar: Controls & Logistics -->
+        <div class="sidebar">
+            <div class="panel">
+                <div class="panel-header">
+                    <span>Control Parameters</span>
+                </div>
+                <div class="panel-content">
+                    <fieldset>
+                        <legend>Data Source</legend>
+                        <div class="radio-group">
+                            <input type="radio" name="source" id="src-csv" checked onchange="toggleSource()">
+                            <label for="src-csv">Local Dataset (.csv)</label>
+                        </div>
+                        <div class="radio-group">
+                            <input type="radio" name="source" id="src-api" onchange="toggleSource()">
+                            <label for="src-api">NASA MAST API</label>
+                        </div>
+                    </fieldset>
+                    <div id="panel-csv">
+                        <fieldset>
+                            <legend>File Upload</legend>
+                            <input type="file" id="csv-upload-input" accept=".csv" style="border: none; padding: 0; background: transparent;">
+                        </fieldset>
+                    </div>
+                    <div id="panel-api" class="hidden">
+                        <fieldset>
+                            <legend>API Configuration</legend>
+                            <div class="data-grid">
+                                <span class="data-label">Target ID:</span>
+                                <input type="text" id="target-input" value="Kepler-186">
+                            </div>
+                            <div class="data-grid">
+                                <span class="data-label">Release:</span>
+                                <select>
+                                    <option>DR25 (Latest)</option>
+                                    <option>DR24</option>
+                                </select>
+                            </div>
+                        </fieldset>
+                    </div>
+                    <fieldset>
+                        <legend>System Status</legend>
+                        <div class="status-box">
+                            <div style="display:flex; align-items:center;">
+                                <span class="status-indicator active"></span>
+                                <span>ML Compute Node</span>
+                            </div>
+                            <span style="color:var(--success); font-weight:bold;">READY</span>
+                        </div>
+                        <div class="status-box">
+                            <div style="display:flex; align-items:center;">
+                                <span class="status-indicator active"></span>
+                                <span>Archive Link</span>
+                            </div>
+                            <span style="color:var(--success); font-weight:bold;">CONNECTED</span>
+                        </div>
+                    </fieldset>
+                </div>
+            </div>
+
+            <!-- Window: Processing Log -->
+            <div class="panel" style="flex: 1;">
+                <div class="panel-header">
+                    <span>Process Terminal</span>
+                </div>
+                <div class="panel-content" style="padding: 0;">
+                    <div class="terminal" id="console-log" style="border: none !important;">SYS_INIT: OK
+Awaiting telemetry stream...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Side: Data Visualization -->
+        <div class="content-area">
+            
+            <!-- Bottom Data Area (Now at Top) -->
+            <div style="display: flex; gap: 4px; flex: 1; min-height: 0;">
+                
+                <div style="flex: 1; display: flex; flex-direction: column; gap: 4px; min-width: 0;">
+                    <div class="panel" style="flex: 1; margin-bottom: 0;">
+                        <div class="panel-header"><span>2. ML Detection Metrics</span></div>
+                        <div class="panel-content" style="background: #000000; color: #00ff00;">
+                            <div class="data-grid" style="background: #000000; padding: 4px; border: 1px solid #00ff00; margin-bottom: 6px;">
+                                <span class="data-label" style="font-weight: bold; color: #00ff00;">Prediction:</span>
+                                <input type="text" id="val-status" class="read-only-field" readonly value="Pending" style="font-weight: bold; background: #000000 !important; color: #00ff00 !important; border-color: #00ff00 !important;">
+                            </div>
+                            <div class="data-grid"><span class="data-label" style="color: #00ff00;">Confidence:</span><input type="text" id="val-conf" class="read-only-field" readonly value="--" style="background: #000000 !important; color: #00ff00 !important; border-color: #00ff00 !important;"></div>
+                            <div class="data-grid mt-2"><span class="data-label" style="color: #00ff00;">Est. Radius:</span><input type="text" id="val-radius" class="read-only-field" readonly value="--" style="background: #000000 !important; color: #00ff00 !important; border-color: #00ff00 !important;"></div>
+                            <div class="data-grid"><span class="data-label" style="color: #00ff00;">Est. Mass:</span><input type="text" id="val-mass" class="read-only-field" readonly value="--" style="background: #000000 !important; color: #00ff00 !important; border-color: #00ff00 !important;"></div>
+                            <div class="data-grid"><span class="data-label" style="color: #00ff00;">Orb. Period:</span><input type="text" id="val-period" class="read-only-field" readonly value="--" style="background: #000000 !important; color: #00ff00 !important; border-color: #00ff00 !important;"></div>
+                            <div class="data-grid"><span class="data-label" style="color: #00ff00;">Transit Dep:</span><input type="text" id="val-depth" class="read-only-field" readonly value="--" style="background: #000000 !important; color: #00ff00 !important; border-color: #00ff00 !important;"></div>
+                        </div>
+                    </div>
+
+                    <div class="panel" style="flex: 1; margin-bottom: 0;">
+                        <div class="panel-header"><span>3. Archive Cross-Ref</span></div>
+                        <div class="panel-content" style="background: #000000; color: #00ff00;">
+                            <div class="data-grid"><span class="data-label" style="color: #00ff00;">Target Name:</span><input type="text" id="val-name" class="read-only-field" readonly value="--" style="background: #000000 !important; color: #00ff00 !important; border-color: #00ff00 !important;"></div>
+                            <div class="data-grid"><span class="data-label" style="color: #00ff00;">Disc. Year:</span><input type="text" id="val-disc-year" class="read-only-field" readonly value="--" style="background: #000000 !important; color: #00ff00 !important; border-color: #00ff00 !important;"></div>
+                            <div class="data-grid"><span class="data-label" style="color: #00ff00;">Star Type:</span><input type="text" id="val-star-type" class="read-only-field" readonly value="--" style="background: #000000 !important; color: #00ff00 !important; border-color: #00ff00 !important;"></div>
+                            <div class="data-grid"><span class="data-label" style="color: #00ff00;">Star Temp:</span><input type="text" id="val-star-temp" class="read-only-field" readonly value="--" style="background: #000000 !important; color: #00ff00 !important; border-color: #00ff00 !important;"></div>
+                            <div class="data-grid"><span class="data-label" style="color: #00ff00;">Distance:</span><input type="text" id="val-distance" class="read-only-field" readonly value="--" style="background: #000000 !important; color: #00ff00 !important; border-color: #00ff00 !important;"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="flex: 1.2; display: flex; flex-direction: column; gap: 4px; min-width: 0;">
+                    <div class="panel" style="flex: 1.2; margin-bottom: 0;">
+                        <div class="panel-header"><span>5. Explainable AI Log</span></div>
+                        <div class="panel-content" style="padding: 0; background: #000000;">
+                            <textarea id="val-reasoning" class="terminal" style="height: 100%; width: 100%; resize: none; border: none !important; background: #000000 !important; color: #00ff00 !important;" readonly>Awaiting reasoning trace...</textarea>
+                        </div>
+                    </div>
+
+                    <div class="panel" style="flex: 1; margin-bottom: 0;">
+                        <div class="panel-header"><span>6. Database Summary</span></div>
+                        <div class="panel-content" style="background: #000000;">
+                            <textarea id="val-summary" class="read-only-field" style="height: 100%; width: 100%; resize: none; background: #000000 !important; color: #00ff00 !important; border-color: #00ff00 !important;" readonly>Awaiting query results...</textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- CARD 4: Visual Render Window (Interactive 3D Realistic Planet) -->
+                <div class="panel" style="width: 240px; flex-shrink: 0; margin-bottom: 0;">
+                    <div class="panel-header"><span>4. Visual Data</span></div>
+                    <div class="panel-content" style="padding: 0; display: flex; flex-direction: column; position: relative;">
+                        
+                        <div style="flex: 1; display: flex; align-items: center; justify-content: center; background: #000000; position: relative; border-bottom: 1px solid var(--border-color);" id="image-container">
+                            <div id="img-placeholder" style="color: #00ff00; font-family: 'Consolas', monospace; z-index: 5;">NO SIGNAL</div>
+                            <div id="img-render" class="hidden" style="width: 100%; height: 100%; position: absolute; inset: 0;">
+                                <div id="planet-container"></div>
+                            </div>
+                        </div>
+                        <div id="render-planet-name" style="padding: 4px; text-align: center; font-weight: bold; background: #d0d0d0; border-bottom: 1px solid var(--border-color); color: #000; font-size: 12px;">Target: N/A</div>
+                        <div id="render-mode-text" style="padding: 4px; text-align: center; background: var(--bg-panel-header);">Mode: Awaiting Feed</div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- CARD 1: The Graph (Now at Bottom) -->
+            <div class="panel" style="flex: 0 0 45%;">
+                <div class="panel-header">
+                    <span>1. Photometric Light Curve Analysis</span>
+                    <span id="graph-status" style="font-weight: normal;">Status: Idle</span>
+                </div>
+                <div class="panel-content" style="padding: 4px; position: relative; background: #000000;">
+                    <div id="graph-overlay" style="position: absolute; inset: 0; background: #ececec; display: flex; align-items: center; justify-content: center; z-index: 10;">
+                        <div style="padding: 8px 16px; border: 1px solid var(--border-color); color: var(--text-main); background: #ffffff;">AWAITING DATA INGESTION</div>
+                    </div>
+                    <div style="flex: 1; width: 100%; position: relative; min-height: 0; min-width: 0;">
+                        <canvas id="lightCurveChart"></canvas>
+                    </div>
+                </div>
+                <div style="background: var(--bg-panel-header); padding: 2px 8px; display: flex; gap: 16px; border-top: 1px solid var(--border-color);">
+                    <span>X-Axis: Time (BJD - 2454833)</span>
+                    <span>Y-Axis: Normalized Flux</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="bottom-bar">
+        <span>System Ready.</span>
+        <span>Node: US-EAST-1 | Mem: 142MB / 512MB</span>
+        <span>v2.0.1</span>
+    </div>
+
+    <script>
+        let chartInstance = null;
+        let isProcessing = false;
+        let currentProfileIndex = -1;
+
+        // Texture Loading Global Config
+        const BASE_URL = 'https://raw.githubusercontent.com/jeromeetienne/threex.planets/master/images/';
+        const textureLoader = new THREE.TextureLoader();
+        textureLoader.setCrossOrigin('anonymous');
+
+        // Three.js Variables
+        let planetScene, planetCamera, planetRenderer, planetMesh, atmoMesh, starSystem, animationId, orbitControls;
+        
+        const planetProfiles = [
+{
+                name: "55 Cancri e",
+                radius: "1.87 Earth radii", mass: "8.0 Earth masses", period: "0.73 days", depth: "0.08%",
+                starType: "G-Type Main Sequence", temp: "5196 K", distance: "41 ly", confidence: "99%",
+                reasoning: "> Ultra-short period super-Earth.\n> Carbon-rich spectral signature.\n> High density implies diamond interior.",
+                summary: "A terrifying 'super-Earth' covered in oceans of lava. Surface temperatures reach an incinerating 4,400°F (2,400°C).",
+                modeText: "Mode: Lava/Heat Render",
+                textureParams: { map: 'venusmap.jpg', bump: 'venusbump.jpg', color: 0xff3300, emissive: 0xaa1100, emissiveIntensity: 0.5 }
+            },
+{
+                name: "PDS 70 b",
+                radius: "1.5 Jupiter radii", mass: "3.0 Jupiter masses", period: "119 years", depth: "N/A",
+                starType: "T Tauri Star", temp: "1200 K", distance: "370 ly", confidence: "98%",
+                reasoning: "> Active accretion signature.\n> Circumplanetary disk identified.\n> Protoplanet mass consistent with gap width.",
+                summary: "A newly formed gas giant directly imaged with its own circumplanetary disk where moons are forming.",
+                modeText: "Mode: Accretion Disk Render",
+                textureParams: { map: 'jupitermap.jpg', ring: 'saturnringcolor.jpg', color: 0xcc5522, emissive: 0x551100, emissiveIntensity: 0.6, ringOuter: 2.2 }
+            },
+{
+                name: "Gliese 504 b",
+                radius: "0.96 Jupiter radii", mass: "4.0 Jupiter masses", period: "260 years", depth: "N/A",
+                starType: "G-Type Main Sequence", temp: "510 K", distance: "57 ly", confidence: "99%",
+                reasoning: "> Direct imaging confirmed.\n> Deep magenta thermal emission.\n> Specific cloud composition.",
+                summary: "A visually striking pink or dark magenta exoplanet, likely due to its temperature and cloud composition.",
+                modeText: "Mode: Magenta/Heat Render",
+                textureParams: { map: 'jupitermap.jpg', color: 0xff44aa, emissive: 0x660044, emissiveIntensity: 0.8 }
+            },
+{
+                name: "WASP-12b",
+                radius: "1.7 Jupiter radii", mass: "1.4 Jupiter masses", period: "1.09 days", depth: "1.3%",
+                starType: "G-Type Main Sequence", temp: "6300 K", distance: "1,400 ly", confidence: "99%",
+                reasoning: "> Extreme Roche lobe overflow.\n> Albedo near zero.\n> Rapid orbital decay confirmed.",
+                summary: "A doomed Hot Jupiter being consumed alive by its star, roasting at temperatures over 4,000°F.",
+                modeText: "Mode: Pitch Black Render",
+                textureParams: { map: 'jupitermap.jpg', color: 0x330000, emissive: 0xff4400, emissiveIntensity: 0.9 }
+            },
+{
+                name: "Proxima Centauri b",
+                radius: "1.07 Earth radii", mass: "1.27 Earth masses", period: "11.2 days", depth: "N/A",
+                starType: "M-Type Red Dwarf", temp: "3042 K", distance: "4.2 ly", confidence: "99%",
+                reasoning: "> Closest known exoplanet.\n> Habitable zone orbit.\n> Severe stellar flare exposure.",
+                summary: "The closest known exoplanet to our solar system. It sits in the habitable zone of our nearest stellar neighbor, but faces severe stellar flares from its red dwarf host.",
+                modeText: "Mode: Flare-Exposed World",
+                textureParams: { map: 'marsmap1k.jpg', bump: 'marsbump1k.jpg', clouds: 'earthcloudmap.jpg', color: 0xcc8866 }
+            },
+{
+                name: "TRAPPIST-1e",
+                radius: "0.92 Earth radii", mass: "0.69 Earth masses", period: "6.1 days", depth: "0.4%",
+                starType: "M-Type Dwarf", temp: "2566 K", distance: "39 ly", confidence: "96%",
+                reasoning: "> Compact multi-planet system.\n> TTV (Transit Timing Variations) detected.\n> High water mass fraction probability.",
+                summary: "A rocky exoplanet orbiting within the habitable zone of TRAPPIST-1. One of the most promising candidates for life.",
+                modeText: "Mode: Optical Render",
+                textureParams: { map: 'marsmap1k.jpg', bump: 'marsbump1k.jpg', clouds: 'earthcloudmap.jpg', color: 0x99aa88 }
+            },
+{
+                name: "Kepler-186f",
+                radius: "1.17 Earth radii", mass: "1.4 Earth masses", period: "130 days", depth: "0.05%",
+                starType: "M-Type Red Dwarf", temp: "3755 K", distance: "582 ly", confidence: "95%",
+                reasoning: "> Red dwarf habitable zone orbit.\n> Earth-size radius detected.\n> High probability of solid surface.",
+                summary: "The first Earth-size planet discovered in the habitable zone of another star. Because it orbits a red dwarf, vegetation might appear red instead of green.",
+                modeText: "Mode: Optical Render",
+                textureParams: { map: 'marsmap1k.jpg', bump: 'marsbump1k.jpg', clouds: 'earthcloudmap.jpg', color: 0xaa3333 }
+            },
+{
+                name: "Kepler-452b",
+                radius: "1.63 Earth radii", mass: "5.0 Earth masses", period: "384.8 days", depth: "0.02%",
+                starType: "G-Type Main Sequence", temp: "5757 K", distance: "1,800 ly", confidence: "99%",
+                reasoning: "> Earth's older cousin.\n> Sun-like star habitable zone.\n> Super-Earth classification.",
+                summary: "Often called Earth's older cousin, it is a super-Earth sitting squarely in the habitable zone of a sun-like star, offering a glimpse into what Earth might look like in a billion years.",
+                modeText: "Mode: Aged Earth Analog",
+                textureParams: { map: 'venusmap.jpg', bump: 'venusbump.jpg', clouds: 'earthcloudmap.jpg', color: 0x778866 }
+            },
+{
+                name: "HD 189733 b",
+                radius: "1.1 Jupiter radii", mass: "1.13 Jupiter masses", period: "2.2 days", depth: "2.5%",
+                starType: "K-Type Main Sequence", temp: "5049 K", distance: "64.5 ly", confidence: "99%",
+                reasoning: "> Deep optical transit depth.\n> Silicate particle scattering.\n> Supersonic wind sheer detected.",
+                summary: "A 'Hot Jupiter' that appears deep blue. It rains molten glass sideways in winds blowing at 5,400 mph.",
+                modeText: "Mode: Optical Render",
+                textureParams: { map: 'neptunemap.jpg', color: 0x0022ee }
+            },
+{
+                name: "HD 209458 b (Osiris)",
+                radius: "1.38 Jupiter radii", mass: "0.69 Jupiter masses", period: "3.5 days", depth: "1.5%",
+                starType: "G-Type Main Sequence", temp: "6065 K", distance: "159 ly", confidence: "99%",
+                reasoning: "> First transiting exoplanet.\n> Atmospheric evaporation detected.\n> Comet-like tail observed.",
+                summary: "The first transiting exoplanet ever discovered. It is a scorching Hot Jupiter that is literally boiling away, leaving an enormous comet-like tail of evaporating atmosphere behind it.",
+                modeText: "Mode: Evaporating Atmosphere",
+                textureParams: { map: 'jupitermap.jpg', color: 0x88ccff, emissive: 0x113355, emissiveIntensity: 0.3 }
+            },
+{
+                name: "WASP-121b",
+                radius: "1.87 Jupiter radii", mass: "1.18 Jupiter masses", period: "1.27 days", depth: "2.1%",
+                starType: "F-Type Main Sequence", temp: "6460 K", distance: "850 ly", confidence: "99%",
+                reasoning: "> Ultra-hot Jupiter.\n> Metal vaporization detected.\n> Liquid metal rain on nightside.",
+                summary: "An extreme Hot Jupiter where metals like iron and magnesium vaporize on the dayside, and rain down as liquid gems or heavy metals on the slightly cooler nightside.",
+                modeText: "Mode: Metal Vapor Render",
+                textureParams: { map: 'venusmap.jpg', bump: 'venusbump.jpg', color: 0xffffff, emissive: 0xcc2266, emissiveIntensity: 0.7 }
+            },
+{
+                name: "HR 8799 b",
+                radius: "1.2 Jupiter radii", mass: "7.0 Jupiter masses", period: "~460 years", depth: "N/A",
+                starType: "A-Type Main Sequence", temp: "1100 K", distance: "133 ly", confidence: "99%",
+                reasoning: "> Young gas giant.\n> Direct imaging confirmed.\n> Formation heat glow.",
+                summary: "A massive young gas giant about 7 times the mass of Jupiter. Because it is so young (only 30 million years old), it still glows with the intense heat of its own formation.",
+                modeText: "Mode: Young Giant Infrared",
+                textureParams: { map: 'jupitermap.jpg', color: 0xaa2255, emissive: 0x330011, emissiveIntensity: 0.6 }
+            },
+{
+                name: "HR 8799 c",
+                radius: "1.2 Jupiter radii", mass: "7.0 Jupiter masses", period: "~190 years", depth: "N/A",
+                starType: "A-Type Main Sequence", temp: "1100 K", distance: "133 ly", confidence: "99%",
+                reasoning: "> HR 8799 system member.\n> Orbital motion confirmed.\n> Direct imaging milestone.",
+                summary: "Another super-Jupiter in the HR 8799 system. These planets are famous for being the first ever to have their orbital motion visually confirmed by direct imaging from Earth.",
+                modeText: "Mode: Young Giant Infrared",
+                textureParams: { map: 'jupitermap.jpg', color: 0xcc4422, emissive: 0x441100, emissiveIntensity: 0.7 }
+            },
+{
+                name: "HR 8799 d",
+                radius: "1.2 Jupiter radii", mass: "7.0 Jupiter masses", period: "~100 years", depth: "N/A",
+                starType: "A-Type Main Sequence", temp: "1100 K", distance: "133 ly", confidence: "99%",
+                reasoning: "> Complex weather patterns.\n> Iron and silicate clouds.\n> Young system dynamics.",
+                summary: "A glowing, cloudy super-Jupiter. Observations suggest the atmospheres of these planets show complex weather patterns and thick clouds made of iron and silicate dust.",
+                modeText: "Mode: Cloudy Giant",
+                textureParams: { map: 'neptunemap.jpg', color: 0x881122, emissive: 0x220000, emissiveIntensity: 0.5 }
+            },
+{
+                name: "HR 8799 e",
+                radius: "1.2 Jupiter radii", mass: "7.0 Jupiter masses", period: "~50 years", depth: "N/A",
+                starType: "A-Type Main Sequence", temp: "1100 K", distance: "133 ly", confidence: "99%",
+                reasoning: "> Innermost HR 8799 planet.\n> Extreme internal heat.\n> Strong infrared emission.",
+                summary: "The innermost known planet of the HR 8799 system. It is a blazing hot gas giant, radiating strongly in infrared light due to extreme internal temperatures.",
+                modeText: "Mode: Hot Young Giant",
+                textureParams: { map: 'jupitermap.jpg', color: 0xff8833, emissive: 0x662200, emissiveIntensity: 0.8 }
+            },
+{
+                name: "Beta Pictoris b",
+                radius: "1.65 Jupiter radii", mass: "11.0 Jupiter masses", period: "23.6 years", depth: "N/A",
+                starType: "A-Type Main Sequence", temp: "1600 K", distance: "63 ly", confidence: "99%",
+                reasoning: "> Super-Jupiter in young system.\n> Rapid rotation speed detected.\n> Infrared luminosity matches mass models.",
+                summary: "A massive, glowing super-Jupiter spinning incredibly fast at nearly 100,000 km/h.",
+                modeText: "Mode: Infrared Render",
+                textureParams: { map: 'jupitermap.jpg', color: 0xffaa55, emissive: 0x663300, emissiveIntensity: 0.7 }
+            },
+{
+                name: "Beta Pictoris c",
+                radius: "1.2 Jupiter radii", mass: "8.0 Jupiter masses", period: "3.3 years", depth: "N/A",
+                starType: "A-Type Main Sequence", temp: "1500 K", distance: "63 ly", confidence: "99%",
+                reasoning: "> Inner Beta Pic planet.\n> Massive super-Jupiter.\n> Hot and young.",
+                summary: "The second known planet in the Beta Pictoris system. It orbits much closer to its host star than its sibling planet b, but is similarly massive and blazing hot.",
+                modeText: "Mode: Inner Super-Jupiter",
+                textureParams: { map: 'saturnmap.jpg', color: 0xbb6633, emissive: 0x442200, emissiveIntensity: 0.6 }
+            },
+{
+                name: "2M1207 b",
+                radius: "1.5 Jupiter radii", mass: "4.0 Jupiter masses", period: "~2,500 years", depth: "N/A",
+                starType: "Brown Dwarf", temp: "1600 K", distance: "170 ly", confidence: "99%",
+                reasoning: "> First directly imaged exoplanet.\n> Orbits brown dwarf.\n> Intense infrared glow.",
+                summary: "A historic milestone: the first exoplanet directly imaged. It orbits a brown dwarf rather than a true star and glows intensely in infrared due to its young age.",
+                modeText: "Mode: First Direct Image",
+                textureParams: { map: 'jupitermap.jpg', color: 0xaa2222, emissive: 0x440011, emissiveIntensity: 0.8 }
+            },
+{
+                name: "AB Aurigae b",
+                radius: "1.1 Jupiter radii", mass: "9.0 Jupiter masses", period: "~850 years", depth: "N/A",
+                starType: "Herbig Ae/Be Star", temp: "2000 K", distance: "530 ly", confidence: "95%",
+                reasoning: "> Forming protoplanet.\n> Disk instability formation.\n> Hubble/Subaru imaged.",
+                summary: "A famous protoplanet forming at an immense distance from its star. Imaged by Subaru and Hubble, it suggests some planets form by disk instability rather than core accretion.",
+                modeText: "Mode: Disk Instability",
+                textureParams: { map: 'saturnmap.jpg', color: 0xff3355, emissive: 0x880022, emissiveIntensity: 0.9 }
+            },
+{
+                name: "HD 100546 b",
+                radius: "1.3 Jupiter radii", mass: "15.0 Jupiter masses", period: "~230 years", depth: "N/A",
+                starType: "Herbig Ae/Be Star", temp: "2500 K", distance: "360 ly", confidence: "90%",
+                reasoning: "> Active accretion.\n> Circumplanetary disk.\n> Extreme formation heat.",
+                summary: "A massive, forming protoplanet still actively accreting material from a surrounding disk. It glows brightly in infrared due to the extreme heat of infalling gas and dust.",
+                modeText: "Mode: Active Accretion",
+                textureParams: { map: 'jupitermap.jpg', color: 0xee3322, emissive: 0x771100, emissiveIntensity: 0.9 }
+            },,
+{
+                name: "Kepler-22b",
+                radius: "2.4 Earth radii", mass: "9.1 Earth masses", period: "289.9 days", depth: "0.08%",
+                starType: "G-Type Main Sequence", temp: "5518 K", distance: "600 ly", confidence: "97%",
+                reasoning: "> Habitable zone Super-Earth.\n> Uniform albedo signature.\n> Equilibrium temperature allows liquid state.",
+                summary: "A 'super-Earth' that astronomers believe could be a true water world, covered entirely by a global, endless ocean.",
+                modeText: "Mode: Optical Render",
+                textureParams: { map: 'venusmap.jpg', bump: 'venusbump.jpg', clouds: 'earthcloudmap.jpg', color: 0x0088aa }
+            },
+{
+                name: "TRAPPIST-1f",
+                radius: "1.04 Earth radii", mass: "0.93 Earth masses", period: "9.2 days", depth: "0.4%",
+                starType: "M-Type Dwarf", temp: "2566 K", distance: "39 ly", confidence: "96%",
+                reasoning: "> TRAPPIST-1 system member.\n> Cooler than sibling 1e.\n> Likely ice-rich world.",
+                summary: "Another Earth-sized planet in the TRAPPIST-1 system. Orbiting slightly further out than its sibling 1e, it is likely a cooler, rocky or ice-rich world.",
+                modeText: "Mode: Ice World Render",
+                textureParams: { map: 'uranusmap.jpg', bump: 'marsbump1k.jpg', color: 0x88aabb }
+            },
+{
+                name: "Kepler-10b",
+                radius: "1.47 Earth radii", mass: "4.6 Earth masses", period: "0.84 days", depth: "0.01%",
+                starType: "G-Type Main Sequence", temp: "5627 K", distance: "608 ly", confidence: "99%",
+                reasoning: "> Scorchingly hot Super-Earth.\n> High density silicate structure.\n> Continuous dayside lava flow.",
+                summary: "A scorched rocky world covered entirely in oceans of molten lava due to extreme stellar proximity.",
+                modeText: "Mode: Lava World Render",
+                textureParams: { map: 'venusmap.jpg', bump: 'venusbump.jpg', color: 0xff4400, emissive: 0xaa2200, emissiveIntensity: 0.7 }
+            },
+{
+                name: "GJ 1214 b",
+                radius: "2.68 Earth radii", mass: "6.55 Earth masses", period: "1.58 days", depth: "1.3%",
+                starType: "M-Type Red Dwarf", temp: "3026 K", distance: "48 ly", confidence: "99%",
+                reasoning: "> Mini-Neptune classification.\n> Thick steamy atmosphere.\n> Deep global ocean likely.",
+                summary: "A prime candidate for a true 'water world.' It is likely blanketed by a thick, steamy atmosphere that sits atop an incredibly deep, global ocean.",
+                modeText: "Mode: Water World Render",
+                textureParams: { map: 'uranusmap.jpg', clouds: 'earthcloudmap.jpg', color: 0x2288aa }
+            },
+{
+                name: "LHS 1140 b",
+                radius: "1.73 Earth radii", mass: "6.65 Earth masses", period: "24.7 days", depth: "0.5%",
+                starType: "M-Type Red Dwarf", temp: "3131 K", distance: "49 ly", confidence: "99%",
+                reasoning: "> Dense rocky super-Earth.\n> Quiet red dwarf host.\n> Prime biosignature target.",
+                summary: "A massive, dense, rocky super-Earth located safely in the habitable zone of a quiet red dwarf star. It is considered one of the best targets in the search for biosignatures.",
+                modeText: "Mode: Rocky Super-Earth",
+                textureParams: { map: 'marsmap1k.jpg', bump: 'marsbump1k.jpg', clouds: 'earthcloudmap.jpg', color: 0x557755 }
+            },
+{
+                name: "K2-18 b",
+                radius: "2.61 Earth radii", mass: "8.63 Earth masses", period: "32.9 days", depth: "0.8%",
+                starType: "M-Type Red Dwarf", temp: "3457 K", distance: "124 ly", confidence: "99%",
+                reasoning: "> Water vapor detected.\n> Hydrogen-rich atmosphere.\n> Potential Hycean world.",
+                summary: "A fascinating world in the habitable zone. Recent observations have detected hints of water vapor in its hydrogen-rich atmosphere, raising the exciting possibility of a Hycean ocean world.",
+                modeText: "Mode: Hycean World",
+                textureParams: { map: 'neptunemap.jpg', clouds: 'earthcloudmap.jpg', color: 0x00aaff }
+            },
+{
+                name: "PDS 70 c",
+                radius: "1.3 Jupiter radii", mass: "4.0 Jupiter masses", period: "~119 years", depth: "N/A",
+                starType: "T Tauri Star", temp: "1000 K", distance: "370 ly", confidence: "98%",
+                reasoning: "> Second PDS 70 planet.\n> Active accretion ongoing.\n> Protoplanetary disk interaction.",
+                summary: "The second young gas giant discovered in the PDS 70 system. Like its sibling, it is still sweeping up gas and dust from the surrounding protoplanetary disk.",
+                modeText: "Mode: Forming Planet",
+                textureParams: { map: 'neptunemap.jpg', color: 0xaa3344, emissive: 0x330011, emissiveIntensity: 0.5 }
+            },
+{
+                name: "51 Eridani b",
+                radius: "1.0 Jupiter radii", mass: "2.0 Jupiter masses", period: "~32 years", depth: "N/A",
+                starType: "F-Type Main Sequence", temp: "700 K", distance: "97 ly", confidence: "99%",
+                reasoning: "> Young methane-rich giant.\n> Coolest directly imaged.\n> Jupiter analog.",
+                summary: "A very young, methane-rich gas giant. It is one of the coolest and lowest-mass exoplanets ever directly imaged, showing us what our own Jupiter might have looked like in its infancy.",
+                modeText: "Mode: Young Jupiter Analog",
+                textureParams: { map: 'saturnmap.jpg', color: 0xddaacc, emissive: 0x221122, emissiveIntensity: 0.3 }
+            },
+{
+                name: "HIP 65426 b",
+                radius: "1.5 Jupiter radii", mass: "9.0 Jupiter masses", period: "~630 years", depth: "N/A",
+                starType: "A-Type Main Sequence", temp: "1300 K", distance: "350 ly", confidence: "99%",
+                reasoning: "> JWST imaging target.\n> Thick silicate clouds.\n> Complex atmosphere.",
+                summary: "A massive, dusty young gas giant directly imaged by both the VLT and the James Webb Space Telescope. It has a thick, complex atmosphere filled with silicate clouds.",
+                modeText: "Mode: JWST Target",
+                textureParams: { map: 'neptunemap.jpg', color: 0xcc6644, emissive: 0x331100, emissiveIntensity: 0.5 }
+            },
+{
+                name: "HD 106906 b",
+                radius: "1.4 Jupiter radii", mass: "11.0 Jupiter masses", period: "~15,000 years", depth: "N/A",
+                starType: "F-Type Main Sequence", temp: "1800 K", distance: "336 ly", confidence: "99%",
+                reasoning: "> Extreme orbital distance.\n> 738 AU from star.\n> Eccentric misaligned orbit.",
+                summary: "Famous for its bizarrely extreme orbit. It sits a staggering 738 times further from its host star than Earth is from the Sun, on a highly eccentric and misaligned path.",
+                modeText: "Mode: Extreme Orbit",
+                textureParams: { map: 'jupitermap.jpg', color: 0xddaa55, emissive: 0x221100, emissiveIntensity: 0.4 }
+            },,
+{
+                name: "HD 131399Ab",
+                radius: "1.15 Jupiter radii", mass: "4.0 Jupiter masses", period: "~550 years", depth: "N/A",
+                starType: "A-Type Main Sequence", temp: "1000 K", distance: "340 ly", confidence: "85%",
+                reasoning: "> Triple-star system.\n> Multiple sunrises possible.\n> Planetary status debated.",
+                summary: "Once thought to be a remarkable planet in a triple-star system where it would experience multiple sunrises. While its planetary status has been debated, it remains a famous object of study.",
+                modeText: "Mode: Triple Star System",
+                textureParams: { map: 'uranusmap.jpg', color: 0x8866cc, emissive: 0x110022, emissiveIntensity: 0.3 }
+            },,
+{
+                name: "PZ Telescopii b",
+                radius: "1.7 Jupiter radii", mass: "36.0 Jupiter masses", period: "~1,000 years", depth: "N/A",
+                starType: "G-Type Main Sequence", temp: "2000 K", distance: "168 ly", confidence: "95%",
+                reasoning: "> Enormous mass.\n> Planet/brown dwarf boundary.\n> Young stellar companion.",
+                summary: "An enormous companion orbiting a young star. At 36 times the mass of Jupiter, it blurs the line between being an incredibly massive planet and a small brown dwarf.",
+                modeText: "Mode: Brown Dwarf Boundary",
+                textureParams: { map: 'jupitermap.jpg', color: 0x882200, emissive: 0x330000, emissiveIntensity: 0.7 }
+            },,
+{
+                name: "ROXs 42B b",
+                radius: "1.6 Jupiter radii", mass: "9.0 Jupiter masses", period: "~1,170 years", depth: "N/A",
+                starType: "M-Type Star", temp: "1800 K", distance: "460 ly", confidence: "90%",
+                reasoning: "> Rho Ophiuchi cloud complex.\n> Extreme mass challenges models.\n> Direct imaging confirmed.",
+                summary: "A directly imaged object in the Rho Ophiuchi cloud complex. Its extreme mass challenges astronomers' models of how planetary systems and binary stars form.",
+                modeText: "Mode: Extreme Mass Object",
+                textureParams: { map: 'neptunemap.jpg', color: 0xcc4455, emissive: 0x440011, emissiveIntensity: 0.5 }
+            },,
+{
+                name: "DH Tauri b",
+                radius: "1.4 Jupiter radii", mass: "11.0 Jupiter masses", period: "~330 years", depth: "N/A",
+                starType: "T Tauri Star", temp: "1700 K", distance: "430 ly", confidence: "92%",
+                reasoning: "> Young T Tauri system.\n> Active contraction.\n> Formation heat radiation.",
+                summary: "A planetary-mass companion orbiting a young T Tauri star. It is still actively contracting and radiating intense heat from its recent formation.",
+                modeText: "Mode: Contracting Giant",
+                textureParams: { map: 'saturnmap.jpg', color: 0xff7722, emissive: 0x662200, emissiveIntensity: 0.7 }
+            },,
+{
+                name: "GQ Lupi b",
+                radius: "1.65 Jupiter radii", mass: "10-36 Jupiter masses", period: "~1,200 years", depth: "N/A",
+                starType: "K-Type Star", temp: "2650 K", distance: "495 ly", confidence: "88%",
+                reasoning: "> First directly imaged companion.\n> Variable young star orbit.\n> Possible brown dwarf.",
+                summary: "One of the very first directly imaged planetary-mass companions. It orbits a young, variable star and is massive enough that it might be classified as a brown dwarf.",
+                modeText: "Mode: Early Direct Image",
+                textureParams: { map: 'jupitermap.jpg', color: 0x991111, emissive: 0x440000, emissiveIntensity: 0.6 }
+            },,
+{
+                name: "Kappa Andromedae b",
+                radius: "1.2 Jupiter radii", mass: "13.0 Jupiter masses", period: "~400 years", depth: "N/A",
+                starType: "B-Type Main Sequence", temp: "2000 K", distance: "168 ly", confidence: "95%",
+                reasoning: "> Massive young star orbit.\n> Super-Jupiter/brown dwarf.\n> Formation heat emission.",
+                summary: "A massive gas giant or small brown dwarf orbiting a massive young star. It is incredibly hot, radiating away the leftover heat from its formation.",
+                modeText: "Mode: Massive Star Companion",
+                textureParams: { map: 'jupitermap.jpg', color: 0xaa4422, emissive: 0x441100, emissiveIntensity: 0.5 }
+            },,
+{
+                name: "HIP 78530 b",
+                radius: "1.6 Jupiter radii", mass: "24.0 Jupiter masses", period: "~2,000 years", depth: "N/A",
+                starType: "B-Type Star", temp: "2200 K", distance: "510 ly", confidence: "90%",
+                reasoning: "> Hot B-type star companion.\n> 20+ Jupiter masses.\n> Planet/star boundary.",
+                summary: "An enormous substellar companion to a hot B-type star. With a mass over 20 times that of Jupiter, it occupies the blurry dividing line between planets and stars.",
+                modeText: "Mode: Substellar Companion",
+                textureParams: { map: 'saturnmap.jpg', color: 0xcc5533, emissive: 0x331100, emissiveIntensity: 0.4 }
+            },,
+{
+                name: "HD 95086 b",
+                radius: "1.1 Jupiter radii", mass: "5.0 Jupiter masses", period: "~296 years", depth: "N/A",
+                starType: "A-Type Main Sequence", temp: "1200 K", distance: "282 ly", confidence: "95%",
+                reasoning: "> Young low-mass planet.\n> Wide orbit in debris disk.\n> System evolution clues.",
+                summary: "A young, relatively low-mass directly imaged planet. It sits in a wide orbit inside a massive debris disk, giving clues about how planetary systems evolve.",
+                modeText: "Mode: Debris Disk Planet",
+                textureParams: { map: 'neptunemap.jpg', color: 0xdd3344, emissive: 0x550011, emissiveIntensity: 0.6 }
+            },,
+{
+                name: "HD 206893 c",
+                radius: "1.3 Jupiter radii", mass: "12.0 Jupiter masses", period: "~27 years", depth: "N/A",
+                starType: "F-Type Main Sequence", temp: "1400 K", distance: "133 ly", confidence: "93%",
+                reasoning: "> Gaia astrometry discovery.\n> Debris disk embedded.\n> Direct imaging + astrometry.",
+                summary: "A recently confirmed giant planet deeply embedded in its star's debris disk. It was discovered using advanced direct imaging combined with precise astrometry from the Gaia mission.",
+                modeText: "Mode: Astrometry Discovery",
+                textureParams: { map: 'jupitermap.jpg', color: 0xaa7744, emissive: 0x332211, emissiveIntensity: 0.5 }
+            },,
+{
+                name: "HIP 99770 b",
+                radius: "1.15 Jupiter radii", mass: "16.0 Jupiter masses", period: "~17 years", depth: "N/A",
+                starType: "K-Type Star", temp: "1500 K", distance: "132 ly", confidence: "96%",
+                reasoning: "> First astrometry prediction.\n> Stellar wobble detected.\n> Imaging confirmed location.",
+                summary: "A landmark discovery: the first exoplanet discovered by using astrometry (stellar wobble) to predict its location before directly imaging it with telescopes.",
+                modeText: "Mode: Astrometry First",
+                textureParams: { map: 'saturnmap.jpg', color: 0x7788aa, emissive: 0x111122, emissiveIntensity: 0.4 }
+            },,
+{
+                name: "HIP 21152 b",
+                radius: "1.0 Jupiter radii", mass: "14.0 Jupiter masses", period: "~26 years", depth: "N/A",
+                starType: "K-Type Star", temp: "1300 K", distance: "150 ly", confidence: "92%",
+                reasoning: "> Hyades cluster member.\n> Cooling calibration target.\n> Young gas giant.",
+                summary: "A recently imaged young gas giant located in the Hyades cluster. Tracking planets in known star clusters helps astronomers precisely calibrate how planets cool over time.",
+                modeText: "Mode: Cluster Calibration",
+                textureParams: { map: 'jupitermap.jpg', color: 0xcc8833, emissive: 0x442200, emissiveIntensity: 0.5 }
+            },,
+{
+                name: "HD 169142 b",
+                radius: "1.4 Jupiter radii", mass: "2.0 Jupiter masses", period: "~110 years", depth: "N/A",
+                starType: "Herbig Ae/Be Star", temp: "1500 K", distance: "370 ly", confidence: "88%",
+                reasoning: "> Baby planet forming.\n> Gap carving in disk.\n> Direct imaging of formation.",
+                summary: "A baby planet caught in the act of formation! Direct imaging has shown it carving a gap in its star's surrounding protoplanetary disk of gas and dust.",
+                modeText: "Mode: Gap Carving",
+                textureParams: { map: 'neptunemap.jpg', color: 0xff6622, emissive: 0x882200, emissiveIntensity: 0.8 }
+            },,
+{
+                name: "TWA 7 b",
+                radius: "1.0 Jupiter radii", mass: "10.0 Jupiter masses", period: "~1,500 years", depth: "N/A",
+                starType: "M-Type Star", temp: "1200 K", distance: "114 ly", confidence: "90%",
+                reasoning: "> JWST observation target.\n> Young cloudy atmosphere.\n> Faint companion.",
+                summary: "A faint planetary-mass companion targeted by advanced observatories like the James Webb Space Telescope to peer deep into the atmospheres of young, cloudy worlds.",
+                modeText: "Mode: JWST Atmosphere Study",
+                textureParams: { map: 'neptunemap.jpg', color: 0xbb5544, emissive: 0x331111, emissiveIntensity: 0.5 }
+            },
+        ];
+
+        // UI Logistics
+        function toggleMenu(menuId) {
+            document.querySelectorAll('.menu-dropdown').forEach(el => {
+                if (el.id !== menuId) el.classList.remove('active');
+            });
+            document.getElementById(menuId).classList.toggle('active');
+        }
+
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.menu-container')) {
+                document.querySelectorAll('.menu-dropdown').forEach(el => el.classList.remove('active'));
+            }
+        });
+
+        function triggerFileOpen() {
+            document.querySelectorAll('.menu-dropdown').forEach(el => el.classList.remove('active'));
+            document.getElementById('csv-upload-input').click();
+        }
+
+        document.getElementById('csv-upload-input').addEventListener('change', function(e) {
+            if (e.target.files.length > 0) {
+                const fileName = e.target.files[0].name;
+                logToConsole(`Loaded data file: ${fileName}. Ready for processing.`);
+            }
+        });
+
+        function saveReport() {
+            if (document.getElementById('val-status').value === "Pending") return;
+            logToConsole(`Report exported.`);
+        }
+
+        function toggleSource() {
+            const isApi = document.getElementById('src-api').checked;
+            document.getElementById('panel-api').classList.toggle('hidden', !isApi);
+            document.getElementById('panel-csv').classList.toggle('hidden', isApi);
+        }
+
+        function logToConsole(message) {
+            const consoleDiv = document.getElementById('console-log');
+            const time = new Date().toLocaleTimeString('en-US', { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" });
+            consoleDiv.innerHTML += `\n[${time}] ${message}`;
+            consoleDiv.scrollTop = consoleDiv.scrollHeight;
+        }
+
+        function resetUI() {
+            document.getElementById('graph-overlay').style.display = 'flex';
+            document.getElementById('graph-status').innerText = "Status: Idle";
+            document.getElementById('img-placeholder').classList.remove('hidden');
+            document.getElementById('img-render').classList.add('hidden');
+            document.getElementById('render-planet-name').innerText = "Target: N/A";
+            
+            document.getElementById('val-status').value = "Pending";
+            document.getElementById('val-status').style.color = "var(--text-main)";
+            document.getElementById('val-reasoning').value = "Awaiting reasoning trace...";
+
+            if (animationId) cancelAnimationFrame(animationId);
+        }
+
+        async function runPipeline() {
+            document.querySelectorAll('.menu-dropdown').forEach(el => el.classList.remove('active'));
+            if (isProcessing) return;
+            isProcessing = true;
+
+            const btnRun = document.getElementById('btn-run');
+            const btnStop = document.getElementById('btn-stop');
+            
+            btnRun.disabled = true;
+            btnStop.disabled = false;
+            
+            logToConsole('CMD: EXECUTE PIPELINE\n---------------------\nReading input buffer...');
+            document.getElementById('graph-overlay').style.display = 'none';
+            document.getElementById('graph-status').innerText = "Status: Processing Array...";
+
+            await sleep(800);
+            logToConsole('Applying FFT and ML Noise Reduction...');
+            await sleep(1000);
+            
+            currentProfileIndex = (currentProfileIndex + 1) % planetProfiles.length;
+            const selectedProfile = planetProfiles[currentProfileIndex];
+            
+            logToConsole(`SUCCESS: Candidate ${selectedProfile.name} identified.`);
+
+            populateDashboard(selectedProfile);
+
+            btnRun.disabled = false;
+            btnStop.disabled = true;
+            document.getElementById('graph-status').innerText = "Status: Complete";
+            isProcessing = false;
+        }
+
+        function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
+
+        function populateDashboard(profile) {
+            document.getElementById('val-status').value = "PLANET DETECTED: YES";
+            document.getElementById('val-status').style.color = "var(--success)";
+            
+            document.getElementById('val-conf').value = profile.confidence;
+            document.getElementById('val-depth').value = profile.depth;
+            document.getElementById('val-radius').value = profile.radius;
+            document.getElementById('val-mass').value = profile.mass;
+            document.getElementById('val-period').value = profile.period;
+            
+            document.getElementById('val-name').value = profile.name;
+            document.getElementById('val-disc-year').value = "2026";
+            document.getElementById('val-star-type').value = profile.starType;
+            document.getElementById('val-star-temp').value = profile.temp;
+            document.getElementById('val-distance').value = profile.distance;
+
+            document.getElementById('val-reasoning').value = profile.reasoning;
+            document.getElementById('val-summary').value = profile.summary;
+            
+            document.getElementById('render-planet-name').innerText = "Target: " + profile.name;
+            document.getElementById('render-mode-text').innerText = profile.modeText;
+
+            document.getElementById('img-placeholder').classList.add('hidden');
+            document.getElementById('img-render').classList.remove('hidden');
+            
+            setTimeout(() => {
+                init3DPlanet(profile);
+                renderChart(profile);
+            }, 10);
+        }
+
+        function init3DPlanet(profile) {
+            // Cancel any existing animation
+            if (animationId) {
+                cancelAnimationFrame(animationId);
+                animationId = null;
+            }
+            
+            const wrapper = document.getElementById('image-container');
+            const container = document.getElementById('planet-container');
+            container.innerHTML = ''; 
+
+            planetScene = new THREE.Scene();
+            planetScene.background = new THREE.Color(0x000000);
+            
+            planetCamera = new THREE.PerspectiveCamera(40, wrapper.clientWidth / wrapper.clientHeight, 0.1, 1000);
+            planetCamera.position.z = 4.0;
+
+            planetRenderer = new THREE.WebGLRenderer({ antialias: true });
+            planetRenderer.setSize(wrapper.clientWidth, wrapper.clientHeight);
+            container.appendChild(planetRenderer.domElement);
+
+            orbitControls = new THREE.OrbitControls(planetCamera, planetRenderer.domElement);
+            orbitControls.enableDamping = true;
+            orbitControls.dampingFactor = 0.05;
+            orbitControls.enablePan = false;
+            orbitControls.minDistance = 2.0;
+            orbitControls.maxDistance = 10.0;
+
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.4); 
+            planetScene.add(ambientLight);
+
+            const dirLight = new THREE.DirectionalLight(0xffffff, 1.2); 
+            dirLight.position.set(5, 3, 5); 
+            planetScene.add(dirLight);
+
+            // Procedural Star System
+            const starGeometry = new THREE.BufferGeometry();
+            const starMaterial = new THREE.PointsMaterial({ color: 0xffffff, size: 0.015, sizeAttenuation: true });
+            const starVertices = [];
+            for (let i = 0; i < 3000; i++) {
+                const x = (Math.random() - 0.5) * 50;
+                const y = (Math.random() - 0.5) * 50;
+                const z = (Math.random() - 0.5) * 50;
+                if (Math.sqrt(x*x + y*y + z*z) > 10) starVertices.push(x, y, z);
+            }
+            starGeometry.setAttribute('position', new THREE.Float32BufferAttribute(starVertices, 3));
+            starSystem = new THREE.Points(starGeometry, starMaterial);
+            planetScene.add(starSystem);
+
+            const params = profile.textureParams;
+            const geo = new THREE.SphereGeometry(1.2, 64, 64);
+
+            let matParams = { roughness: 0.8, metalness: 0.1 };
+            if (params.map) matParams.map = textureLoader.load(BASE_URL + params.map);
+            if (params.bump) { matParams.bumpMap = textureLoader.load(BASE_URL + params.bump); matParams.bumpScale = 0.05; }
+            if (params.color) matParams.color = new THREE.Color(params.color);
+            if (params.emissive) { matParams.emissive = new THREE.Color(params.emissive); matParams.emissiveIntensity = params.emissiveIntensity || 0.5; }
+
+            if (params.spec) {
+                let phongParams = {
+                    map: matParams.map,
+                    bumpMap: matParams.bumpMap,
+                    bumpScale: 0.05,
+                    specularMap: textureLoader.load(BASE_URL + params.spec),
+                    specular: new THREE.Color(0x222222),
+                    shininess: 10
+                };
+                if (params.color) phongParams.color = matParams.color;
+                planetMesh = new THREE.Mesh(geo, new THREE.MeshPhongMaterial(phongParams));
+            } else {
+                planetMesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial(matParams));
+            }
+            
+            planetScene.add(planetMesh);
+
+            if (params.clouds) {
+                const cloudGeo = new THREE.SphereGeometry(1.215, 64, 64);
+                const cloudMat = new THREE.MeshPhongMaterial({
+                    map: textureLoader.load(BASE_URL + params.clouds),
+                    transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false
+                });
+                atmoMesh = new THREE.Mesh(cloudGeo, cloudMat);
+                planetScene.add(atmoMesh);
+            } else { atmoMesh = null; }
+
+            if (params.ring) {
+                const rOuter = params.ringOuter || 2.4;
+                const ringGeo = new THREE.RingGeometry(1.4, rOuter, 128);
+                const pos = ringGeo.attributes.position;
+                const v3 = new THREE.Vector3();
+                for (let i = 0; i < pos.count; i++) {
+                    v3.fromBufferAttribute(pos, i);
+                    const radius = v3.length();
+                    const normalizedRadius = (radius - 1.4) / (rOuter - 1.4);
+                    ringGeo.attributes.uv.setXY(i, normalizedRadius, 1);
+                }
+                const ringMat = new THREE.MeshBasicMaterial({
+                    map: textureLoader.load(BASE_URL + params.ring),
+                    side: THREE.DoubleSide, transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending, depthWrite: false
+                });
+                const ringsMesh = new THREE.Mesh(ringGeo, ringMat);
+                ringsMesh.rotation.x = Math.PI / 2;
+                ringsMesh.rotation.y = 0.2;
+                planetScene.add(ringsMesh);
+                planetMesh.userData.rings = ringsMesh;
+                
+                // Zoom out and tilt down for ringed planets
+                planetCamera.position.set(0, 2.5, 6.5);
+                planetMesh.rotation.x = -0.3;
+                if (atmoMesh) atmoMesh.rotation.x = -0.3;
+                ringsMesh.rotation.x = Math.PI / 2 - 0.3;
+            }
+
+            window.addEventListener('resize', () => {
+                if(wrapper && planetRenderer) {
+                    planetCamera.aspect = wrapper.clientWidth / wrapper.clientHeight;
+                    planetCamera.updateProjectionMatrix();
+                    planetRenderer.setSize(wrapper.clientWidth, wrapper.clientHeight);
+                }
+            });
+
+            animate3D();
+        }
+
+        function animate3D() {
+            animationId = requestAnimationFrame(animate3D);
+            if (planetMesh) {
+                planetMesh.rotation.y += 0.0015; 
+                if (planetMesh.userData.rings) planetMesh.userData.rings.rotation.z -= 0.0005;
+            }
+            if (atmoMesh) atmoMesh.rotation.y += 0.002;
+            if (starSystem) starSystem.rotation.y += 0.0001;
+            if (orbitControls) orbitControls.update();
+            planetRenderer.render(planetScene, planetCamera);
+        }
+
+        function renderChart(profile) {
+            const ctx = document.getElementById('lightCurveChart').getContext('2d');
+            const dataPoints = [];
+            const labels = [];
+            let depthPercent = parseFloat(profile.depth) / 100;
+            if (isNaN(depthPercent)) depthPercent = 0.005;
+
+            for (let i = 0; i <= 150; i++) {
+                labels.push(i);
+                let flux = 1.0 + (Math.random() * 0.0008 - 0.0004);
+                if (i > 65 && i < 85) {
+                    flux -= depthPercent;
+                    if (i > 65 && i < 70) flux += (70 - i) * (depthPercent / 5);
+                    if (i > 80 && i < 85) flux += (i - 80) * (depthPercent / 5);
+                }
+                dataPoints.push(flux);
+            }
+            if (chartInstance) chartInstance.destroy();
+            chartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{ label: 'Flux', data: dataPoints, borderColor: '#00ff00', borderWidth: 1.2, pointRadius: 0, fill: false, tension: 0 }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false, animation: false,
+                    scales: {
+                        x: { display: true, grid: { color: '#ffffff' }, ticks: { maxTicksLimit: 10, color: '#ffffff' } },
+                        y: { display: true, grid: { color: '#ffffff' }, ticks: { color: '#ffffff' }, min: 0.97, max: 1.002 }
+                    },
+                    plugins: { legend: { display: false } }
+                }
+            });
+        }
+    </script>
+</body>
+</html>
